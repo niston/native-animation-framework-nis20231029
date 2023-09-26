@@ -3,6 +3,7 @@
 #include "Misc/MathUtil.h"
 #include "Scene/SceneBase.h"
 #include "Scene/SceneManager.h"
+#include "RE/Bethesda/UserEvents.h"
 
 namespace Menu::NAF
 {
@@ -21,7 +22,7 @@ namespace Menu::NAF
 					return RE::BSEventNotifyControl::kContinue;
 
 				auto state = Menu::PersistentMenuState::GetSingleton();
-				if (state->restoreSubmenu != Menu::SUB_MENU_TYPE::kInventories)
+				if (state->restoreSubmenu != Menu::SUB_MENU_TYPE::kInventories && state->restoreSubmenu != Menu::SUB_MENU_TYPE::kManageScenes)
 					return RE::BSEventNotifyControl::kContinue;
 
 				if (event.opening) {
@@ -33,6 +34,13 @@ namespace Menu::NAF
 							targetActor->ModifyKeyword(Data::Forms::ShowWornItemsKW, false);
 							a = std::nullopt;
 						}
+					}
+
+					if (state->reenablePlayerControls)
+					{
+						// unlock mouse wheel
+						RE::PlayerCharacter::GetSingleton()->ReenableInputForPlayer();
+						state->reenablePlayerControls = false;
 					}
 
 					F4SE::GetTaskInterface()->AddTask([]() {
@@ -105,8 +113,18 @@ namespace Menu::NAF
 					state->sceneData->pendingActor = std::nullopt;
 				}
 
-				manager->CloseMenu();
+				manager->CloseMenu();				
+
+				// lock mouse wheel
+				F4SE::stl::enumeration<RE::UserEvents::USER_EVENT_FLAG, uint32_t> flags;
+				flags.set(RE::UserEvents::USER_EVENT_FLAG::kLooking);
+				flags.set(RE::UserEvents::USER_EVENT_FLAG::kPOVSwitch);
+				RE::PlayerCharacter::GetSingleton()->DisableInputForPlayer("MuhLayer", flags.underlying());
+				state->reenablePlayerControls = true;
+
+				// open actor container menu
 				RE::OpenContainerMenu(a, 3, false);
+				
 			}
 		}
 

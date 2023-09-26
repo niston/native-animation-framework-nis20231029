@@ -177,12 +177,14 @@ namespace Menu
 		{
 			uint64_t pendingSceneId = 0;
 			bool isWalkInstance = true;
-			std::optional<RE::ActorHandle> pendingActor = std::nullopt;
+			std::optional<RE::ActorHandle> pendingActor = std::nullopt;			
 		};
 
+		bool reenablePlayerControls = false;
 		SUB_MENU_TYPE restoreSubmenu = kNone;
 		CreatorData* creatorData = CreatorData::GetSingleton();
 		SceneData* sceneData = SceneData::GetSingleton();
+		
 	};
 
 	class IStateManager

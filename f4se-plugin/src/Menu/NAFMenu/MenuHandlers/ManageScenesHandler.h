@@ -132,11 +132,12 @@ namespace Menu::NAF
 			manager->SetPanelShown(false);
 			SetSearchWidgetEnabled(currentStage == kSelectPosition);
 
+			std::vector<SerializableActorHandle> actors;
+
 			switch (currentStage) {
 				case kSelectScene:
 				{
-					BindingsVector result;
-					std::vector<SerializableActorHandle> actors;
+					BindingsVector result;					
 
 					Scene::SceneManager::VisitAllScenes([&](Scene::IScene* scn) {
 
@@ -165,6 +166,15 @@ namespace Menu::NAF
 				}
 				case kManageScene:
 				{
+					//get scene actors
+					actors.clear();
+					Scene::SceneManager::VisitScene(selectionId, [&](Scene::IScene* scn) {
+						scn->ForEachActor([&](RE::Actor* currentActor, Scene::ActorPropertyMap&) {
+							actors.push_back(currentActor->GetActorHandle());
+						});
+					});
+					// use scene name (from actors) for title
+					manager->SetMenuTitle(GetSceneName(actors));
 					CacheSceneInfo();
 					return {
 						{ "Scene Status: Active", std::nullopt },
@@ -210,7 +220,53 @@ namespace Menu::NAF
 		void GotoInventoriesMenu(uint64_t sceneId, int) {
 			auto sceneData = PersistentMenuState::SceneData::GetSingleton();
 			sceneData->pendingSceneId = sceneId;
-			manager->GotoMenu(kInventories, true);
+			
+			// check number of actors in scene
+			Scene::SceneManager::VisitScene(sceneId, [&](Scene::IScene* scn) {
+				if (scn->actors.size() == 1) {
+					ShowActorInventoryDirect(scn->actors.begin()->first, sceneId);
+					//scn->ForEachActor([&](RE::Actor* currentActor, Scene::ActorPropertyMap&) {
+					//	ShowActorInventory(currentActor->GetActorHandle(), sceneId);					
+				}
+				else
+				{
+					// else open inventories menu
+					manager->GotoMenu(kInventories, true);
+				}
+			});
+		}
+
+		void ShowActorInventoryDirect(RE::ActorHandle h, uint64_t sceneId)
+		{
+			RE::Actor* a = h.get().get();
+			if (a) {
+				bool hadSWIKeyword = a->HasKeyword(Data::Forms::ShowWornItemsKW);
+				if (!hadSWIKeyword) {
+					a->ModifyKeyword(Data::Forms::ShowWornItemsKW, true);
+				}
+
+				auto state = PersistentMenuState::GetSingleton();
+				state->sceneData->pendingSceneId = sceneId;
+				state->restoreSubmenu = kManageScenes;
+				state->sceneData->isWalkInstance = false;
+				if (!hadSWIKeyword) {
+					state->sceneData->pendingActor = h;
+				} else {
+					state->sceneData->pendingActor = std::nullopt;
+				}
+
+				manager->CloseMenu();
+
+				// lock mouse wheel
+				F4SE::stl::enumeration<RE::UserEvents::USER_EVENT_FLAG, uint32_t> flags;
+				flags.set(RE::UserEvents::USER_EVENT_FLAG::kLooking);
+				flags.set(RE::UserEvents::USER_EVENT_FLAG::kPOVSwitch);
+				RE::PlayerCharacter::GetSingleton()->DisableInputForPlayer("MuhLayer", flags.underlying());
+				state->reenablePlayerControls = true;
+
+				// open actor container menu
+				RE::OpenContainerMenu(a, 3, false);
+			}
 		}
 
 		void ChangePosition(int) {
