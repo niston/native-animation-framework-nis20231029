@@ -4,6 +4,8 @@
 #include <ppl.h>
 #include <set>
 #include "Serialization/General.h"
+#include "../../extern/CommonLibF4/F4SEStub/runtime/src/Papyrus/Common.h"
+
 
 class GameUtil
 {
@@ -243,8 +245,8 @@ public:
 			if (dist >= 0.1)
 				dist = dist / 25.0;
 
-			auto name = r->GetBaseFullName();
-			result.push_back({ dist, name ? std::string(name) : "", r });
+			auto name = GameUtil::GetDisplayName(r);
+			result.push_back({ dist, std::string(name), r });
 		}
 
 		std::sort(result.begin(), result.end(), [](RefDistInfo<T>& a, RefDistInfo<T>& b) { return a.distance < b.distance; });
@@ -439,4 +441,27 @@ public:
 			targetActor->SetActorValue(*Data::Forms::AnimMultAV, mult);
 		}
 	}
+
+	static std::string_view GetDisplayName(const RE::TESObjectREFR* a_refr)
+		{
+			if (!a_refr)
+				return ""sv;
+
+			const auto obj = a_refr->data.objectReference;
+			const auto extra = a_refr->extraList;
+
+			if (obj && extra) {
+				const auto xText = extra ? extra->GetByType<RE::ExtraTextDisplayData>() : nullptr;
+				if (xText) {
+					return xText->GetDisplayName(obj);
+				}
+
+				const auto full = obj ? obj->As<RE::TESFullName>() : nullptr;
+				if (full) {
+					return full->fullName;
+				}
+			}
+
+			return ""sv;
+		}
 };
